@@ -1,0 +1,21 @@
+[database]
+addr = "127.0.0.1:3306"
+socket = ""
+db = "golbat"
+user = "talon"
+password = "change-me"
+
+[http]
+addr = "127.0.0.1:9042"
+
+[logging]
+level = "info"
+
+[tuning]
+min_confirmations = 5
+agreement = 0.9
+mismatch_threshold = 3
+change_window = "10m"
+evidence_retention = "48h"
+cluster_radius = 250.0
+backfill_batch_size = 1000

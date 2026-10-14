@@ -1,4 +1,4 @@
-ALL=fletchling fletchling-db-refresher fletchling-db-exporter fletchling-osm-importer
+ALL=talonflame talonflame-db-migrate
 
 all: $(ALL)
 
@@ -19,3 +19,9 @@ fletchling-osm-importer: deps
 
 clean:
 	rm -f $(ALL)
+
+talonflame-db-migrate: deps
+	CGO_ENABLED=0 go build ./bin/talonflame-db-migrate/...
+
+talonflame: deps
+	CGO_ENABLED=0 go build ./bin/talonflame/...

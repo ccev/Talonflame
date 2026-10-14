@@ -27,6 +27,9 @@ go.work
 /fletchling-osm-importer
 /fletchling-db-exporter
 /fletchling-db-refresher
+/talonflame-db-migrate
+/talonflame
+/config.toml
 /docker-compose.yml
 /vendor
 /logs

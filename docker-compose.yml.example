@@ -1,33 +1,14 @@
-version: '3.7'
 services:
-  fletchling:
-    image: ghcr.io/unownhash/fletchling:latest
-    container_name: fletchling
+  talonflame:
+    build: .
     restart: unless-stopped
+    network_mode: host
     volumes:
-      - ./configs:/fletchling/configs
-      - ./logs:/fletchling/logs
-      - /etc/timezone:/etc/timezone:ro
-      - /etc/localtime:/etc/localtime:ro
-    ports:
-      - "9042:9042"
+      - ./config.toml:/talonflame/config.toml:ro
+      - /run/mysqld:/run/mysqld:ro
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9042/status"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:9042/healthz"]
       interval: 60s
-      timeout: 30s
+      timeout: 5s
       retries: 3
-      start_period: 30s
-
-  # a container that starts and sleeps. this can be used
-  # to exec into for the importer. See the 'docker-osm-importer.sh'
-  # script.
-  fletchling-tools:
-    image: ghcr.io/unownhash/fletchling:latest
-    container_name: fletchling-tools
-    restart: unless-stopped
-    command: ./sleep
-    volumes:
-      - ./configs:/fletchling/configs
-      - ./logs:/fletchling/logs
-      - /etc/timezone:/etc/timezone:ro
-      - /etc/localtime:/etc/localtime:ro
+      start_period: 60s

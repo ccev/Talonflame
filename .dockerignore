@@ -8,5 +8,8 @@
 /fletchling-db-exporter
 /fletchling-db-refresher
 /fletchling-osm-importer
+/talonflame
+/talonflame-db-migrate
 /Makefile
 /configs
+/config.toml
