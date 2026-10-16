@@ -374,6 +374,9 @@ func TestMariaDBAnalyzerLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer restored.Close()
+	if len(restored.points) != len(restored.byPoint) {
+		t.Fatal("restart did not warm membership for retained evidence")
+	}
 	if !restored.groups[child].Confirmed {
 		t.Fatal("lost subnest on restart")
 	}

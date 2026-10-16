@@ -33,7 +33,7 @@ func (a *Analyzer) Repair(ctx context.Context, now time.Time) error {
 				continue
 			}
 			backed := false
-			for _, o := range a.byGroup[group.ID] {
+			for o := range a.byGroup[group.ID] {
 				if o.Spawnpoint != id && o.Pair == group.Pair && o.At >= hourBoundary(now, group.zone) {
 					backed = true
 					break
@@ -45,7 +45,7 @@ func (a *Analyzer) Repair(ctx context.Context, now time.Time) error {
 		}
 		observations := make([]Observation, 0, len(a.byPoint[id]))
 		for _, o := range a.byPoint[id] {
-			observations = append(observations, o)
+			observations = append(observations, *o)
 		}
 		sort.Slice(observations, func(i, j int) bool { return observations[i].At > observations[j].At })
 		seen := map[uint64]bool{}
@@ -129,7 +129,7 @@ func (a *Analyzer) alternate(point uint64, sources []int64, pair Pair, exclude i
 			if g == nil || g.Pair != pair {
 				continue
 			}
-			for _, o := range a.byGroup[id] {
+			for o := range a.byGroup[id] {
 				if o.Pair != pair {
 					continue
 				}
@@ -208,7 +208,8 @@ func (a *Analyzer) assign(ctx context.Context, point uint64, nest int64, status,
 		return err
 	}
 	a.points[point] = pointState{Nest: nest, Status: status}
-	for _, o := range a.byPoint[point] {
+	for _, entry := range a.byPoint[point] {
+		o := *entry
 		if pair == nil || o.Pair == *pair {
 			o.Nest = nest
 			a.remember(o)
@@ -219,27 +220,9 @@ func (a *Analyzer) assign(ctx context.Context, point uint64, nest int64, status,
 
 func (a *Analyzer) Maintain(ctx context.Context, now time.Time) error {
 	cutoff := now.Add(-a.cfg.Retention).Unix()
+	a.expireEvidence(cutoff)
 	if _, err := a.db.ExecContext(ctx, "DELETE FROM talonflame_evidence WHERE observed_at<?", cutoff); err != nil {
 		return err
-	}
-	for key, o := range a.evidence {
-		if o.At < cutoff {
-			delete(a.evidence, key)
-			delete(a.byGroup[o.Nest], key)
-			delete(a.byPoint[o.Spawnpoint], key)
-			if len(a.byPoint[o.Spawnpoint]) == 0 {
-				delete(a.byPoint, o.Spawnpoint)
-				delete(a.points, o.Spawnpoint)
-			}
-			if len(a.byGroup[o.Nest]) == 0 {
-				delete(a.byGroup, o.Nest)
-			}
-		}
-	}
-	for id, state := range a.points {
-		if state.Status == "outside" || state.Status == "invalid" {
-			delete(a.points, id)
-		}
 	}
 	// Golbat may create a DB row after sending its first webhook. Reconcile
 	// that late row without needing SELECT on Talonflame's spawnpoint column.

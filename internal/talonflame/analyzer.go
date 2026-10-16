@@ -42,9 +42,10 @@ type Analyzer struct {
 	sources           map[int64][]int64
 	groupSources      map[int64][]int64
 	points            map[uint64]pointState
-	evidence          map[evidenceKey]Observation
-	byGroup           map[int64]map[evidenceKey]Observation
-	byPoint           map[uint64]map[evidenceKey]Observation
+	negativePoints    map[uint64]bool
+	evidence          map[evidenceKey]*Observation
+	byGroup           map[int64]map[*Observation]struct{}
+	byPoint           map[uint64][]*Observation
 	dirty             map[int64]bool
 	knownGroups       uint64
 	conflictingGroups uint64
@@ -54,7 +55,7 @@ func New(ctx context.Context, db *sql.DB, logger *logrus.Logger, cfg Config) (*A
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
-	a := &Analyzer{db: db, logger: logger, cfg: cfg, groups: map[int64]*Group{}, sources: map[int64][]int64{}, groupSources: map[int64][]int64{}, points: map[uint64]pointState{}, evidence: map[evidenceKey]Observation{}, byGroup: map[int64]map[evidenceKey]Observation{}, byPoint: map[uint64]map[evidenceKey]Observation{}, dirty: map[int64]bool{}}
+	a := &Analyzer{db: db, logger: logger, cfg: cfg, groups: map[int64]*Group{}, sources: map[int64][]int64{}, groupSources: map[int64][]int64{}, points: map[uint64]pointState{}, negativePoints: map[uint64]bool{}, evidence: map[evidenceKey]*Observation{}, byGroup: map[int64]map[*Observation]struct{}{}, byPoint: map[uint64][]*Observation{}, dirty: map[int64]bool{}}
 	conn, err := db.Conn(ctx)
 	if err != nil {
 		return nil, err
@@ -174,9 +175,9 @@ func (a *Analyzer) restore(ctx context.Context) error {
 		return err
 	}
 	defer rows.Close()
+	var o Observation
+	var nest, form sql.NullInt64
 	for rows.Next() {
-		var o Observation
-		var nest, form sql.NullInt64
 		if err := rows.Scan(&o.Hour, &o.Encounter, &o.Spawnpoint, &nest, &o.Pair.Pokemon, &form, &o.Roll, &o.At); err != nil {
 			return err
 		}
@@ -187,24 +188,51 @@ func (a *Analyzer) restore(ctx context.Context) error {
 		o.Nest = nest.Int64
 		a.remember(o)
 	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	rows.Close()
+	// Warm only points with retained evidence in one streamed scan. Otherwise
+	// the first repair after a restart issues a query for every known point.
+	rows, err = a.db.QueryContext(ctx, "SELECT spawnpoint_id,nest_id,status FROM talonflame_spawnpoint_state")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	var id uint64
+	var status string
+	for rows.Next() {
+		if err := rows.Scan(&id, &nest, &status); err != nil {
+			return err
+		}
+		if len(a.byPoint[id]) != 0 {
+			a.points[id] = pointState{Nest: nest.Int64, Status: status}
+		}
+	}
 	return rows.Err()
 }
 
 func (a *Analyzer) remember(o Observation) {
 	key := o.key()
-	if old, ok := a.evidence[key]; ok && old.Nest != o.Nest {
-		delete(a.byGroup[old.Nest], key)
-		a.dirty[old.Nest] = true
+	entry, exists := a.evidence[key]
+	if exists {
+		if entry.Nest != o.Nest {
+			delete(a.byGroup[entry.Nest], entry)
+			if len(a.byGroup[entry.Nest]) == 0 {
+				delete(a.byGroup, entry.Nest)
+			}
+			a.dirty[entry.Nest] = true
+		}
+	} else {
+		entry = new(Observation)
+		a.evidence[key] = entry
+		a.byPoint[o.Spawnpoint] = append(a.byPoint[o.Spawnpoint], entry)
 	}
-	a.evidence[key] = o
-	if a.byPoint[o.Spawnpoint] == nil {
-		a.byPoint[o.Spawnpoint] = map[evidenceKey]Observation{}
-	}
-	a.byPoint[o.Spawnpoint][key] = o
+	*entry = o
 	if a.byGroup[o.Nest] == nil {
-		a.byGroup[o.Nest] = map[evidenceKey]Observation{}
+		a.byGroup[o.Nest] = map[*Observation]struct{}{}
 	}
-	a.byGroup[o.Nest][key] = o
+	a.byGroup[o.Nest][entry] = struct{}{}
 	a.dirty[o.Nest] = true
 }
 
@@ -265,6 +293,13 @@ func (a *Analyzer) point(ctx context.Context, id uint64) (pointState, error) {
 	if state, ok := a.points[id]; ok {
 		return state, nil
 	}
+	if invalid, ok := a.negativePoints[id]; ok {
+		status := "outside"
+		if invalid {
+			status = "invalid"
+		}
+		return pointState{Status: status}, nil
+	}
 	var nest sql.NullInt64
 	var state pointState
 	err := a.db.QueryRowContext(ctx, "SELECT nest_id,status FROM talonflame_spawnpoint_state WHERE spawnpoint_id=?", id).Scan(&nest, &state.Status)
@@ -285,7 +320,7 @@ func (a *Analyzer) point(ctx context.Context, id uint64) (pointState, error) {
 	}
 	state.Status = status
 	if status == "outside" || status == "invalid" {
-		a.points[id] = state
+		a.cacheNegativePoint(id, status)
 		return state, nil
 	}
 	if len(candidates) > 0 {
@@ -335,9 +370,9 @@ func (a *Analyzer) Evaluate(ctx context.Context, now time.Time) error {
 			continue
 		}
 		observations := make([]Observation, 0, len(a.byGroup[id]))
-		for _, o := range a.byGroup[id] {
+		for o := range a.byGroup[id] {
 			if o.At >= now.Add(-a.cfg.Retention).Unix() {
-				observations = append(observations, o)
+				observations = append(observations, *o)
 			}
 		}
 		if group.Confirmed && !group.Conflicting {

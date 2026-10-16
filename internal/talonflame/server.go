@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"runtime"
 	"sync/atomic"
 	"time"
 )
@@ -60,6 +61,9 @@ func (s *Server) Handler() http.Handler {
 		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
 		fmt.Fprintf(w, "talonflame_webhooks_received_total %d\ntalonflame_processing_errors_total %d\ntalonflame_webhook_queue_batches %d\n", s.received.Load(), s.failed.Load(), len(s.queue))
 		fmt.Fprintf(w, "talonflame_messages_processed_total %d\ntalonflame_evidence_cached %d\ntalonflame_confirmed_nests %d\ntalonflame_conflicting_nests %d\n", s.processed.Load(), s.evidence.Load(), s.confirmed.Load(), s.conflicting.Load())
+		var memory runtime.MemStats
+		runtime.ReadMemStats(&memory)
+		fmt.Fprintf(w, "talonflame_go_heap_alloc_bytes %d\ntalonflame_go_heap_inuse_bytes %d\ntalonflame_go_heap_objects %d\n", memory.HeapAlloc, memory.HeapInuse, memory.HeapObjects)
 	})
 	return mux
 }
@@ -151,6 +155,7 @@ func (s *Server) Run(ctx context.Context) error {
 			if err := s.analyzer.lock.PingContext(ctx); err != nil {
 				return fmt.Errorf("writer lease connection lost: %w", err)
 			}
+			s.analyzer.expireEvidence(now.Add(-s.analyzer.cfg.Retention).Unix())
 			if err := s.analyzer.Repair(ctx, now); err != nil {
 				s.failed.Add(1)
 				s.analyzer.logger.WithError(err).Error("membership repair failed")
