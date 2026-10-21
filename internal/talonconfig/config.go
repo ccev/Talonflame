@@ -24,7 +24,8 @@ type Config struct {
 }
 
 type HTTP struct {
-	Addr string `koanf:"addr"`
+	Addr    string `koanf:"addr"`
+	MapAddr string `koanf:"map_addr"`
 }
 type Logging struct {
 	Level string `koanf:"level"`
@@ -70,6 +71,14 @@ func Load(path string) (Config, error) {
 	}
 	if _, _, err := net.SplitHostPort(cfg.HTTP.Addr); err != nil {
 		return cfg, fmt.Errorf("http.addr must be host:port: %w", err)
+	}
+	if cfg.HTTP.MapAddr != "" {
+		if _, _, err := net.SplitHostPort(cfg.HTTP.MapAddr); err != nil {
+			return cfg, fmt.Errorf("http.map_addr must be host:port: %w", err)
+		}
+		if cfg.HTTP.MapAddr == cfg.HTTP.Addr {
+			return cfg, fmt.Errorf("http.map_addr must differ from http.addr")
+		}
 	}
 	if _, err := logrus.ParseLevel(cfg.Logging.Level); err != nil {
 		return cfg, fmt.Errorf("logging.level: %w", err)

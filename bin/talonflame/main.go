@@ -47,14 +47,24 @@ func run() error {
 	defer analyzer.Close()
 	service := talonflame.NewServer(analyzer)
 	httpServer := &http.Server{Addr: cfg.HTTP.Addr, Handler: service.Handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: time.Minute}
-	errors := make(chan error, 1)
-	go func() { errors <- httpServer.ListenAndServe() }()
+	servers := []*http.Server{httpServer}
+	if cfg.HTTP.MapAddr != "" {
+		servers = append(servers, &http.Server{Addr: cfg.HTTP.MapAddr, Handler: service.MapHandler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: time.Minute})
+	}
+	errors := make(chan error, len(servers))
+	for _, server := range servers {
+		server := server
+		go func() { errors <- server.ListenAndServe() }()
+	}
 	workerCtx, stopWorker := context.WithCancel(context.Background())
 	defer stopWorker()
 	workerErrors := make(chan error, 1)
 	go func() { workerErrors <- service.Run(workerCtx) }()
 	workerStopped := false
 	logger.WithField("listen", cfg.HTTP.Addr).Info("Talonflame webhook receiver started")
+	if cfg.HTTP.MapAddr != "" {
+		logger.WithField("listen", cfg.HTTP.MapAddr).Info("Talonflame read-only map API started")
+	}
 	select {
 	case err = <-errors:
 	case err = <-workerErrors:
@@ -63,13 +73,17 @@ func run() error {
 	}
 	shutdown, stop := context.WithTimeout(context.Background(), 30*time.Second)
 	defer stop()
-	if shutdownErr := httpServer.Shutdown(shutdown); shutdownErr != nil {
-		httpServer.Close()
-		stopWorker()
-		if !workerStopped {
-			<-workerErrors
+	for _, server := range servers {
+		if shutdownErr := server.Shutdown(shutdown); shutdownErr != nil {
+			for _, open := range servers {
+				open.Close()
+			}
+			stopWorker()
+			if !workerStopped {
+				<-workerErrors
+			}
+			return shutdownErr
 		}
-		return shutdownErr
 	}
 	if !workerStopped {
 		service.Drain()

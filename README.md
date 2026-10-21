@@ -53,6 +53,6 @@ Requires Go 1.22+, MariaDB, and Golbat with imported nest polygons and spawnpoin
    ./talonflame
    ```
 
-   Point Golbat's `pokemon` or `pokemon_iv` webhook at `http://127.0.0.1:9042/webhook` (match your configured address). Health, metrics, and inferred nests are available at `/healthz`, `/metrics`, and `/api/nests`.
+   Point Golbat's `pokemon` or `pokemon_iv` webhook at `http://127.0.0.1:9042/webhook` (match your configured address). Health, metrics, and inferred nests are available at `/healthz`, `/metrics`, and `/api/nests`. The cached map API is documented in [docs/API.md](docs/API.md).
 
 For Docker, copy `docker-compose.yml.example` to `docker-compose.yml` and run `docker compose up -d --build` after database preparation. The example uses host networking and a local MariaDB socket.

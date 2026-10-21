@@ -49,6 +49,7 @@ type Analyzer struct {
 	dirty             map[int64]bool
 	knownGroups       uint64
 	conflictingGroups uint64
+	mapInvalidated    func(...int64)
 }
 
 func New(ctx context.Context, db *sql.DB, logger *logrus.Logger, cfg Config) (*Analyzer, error) {
@@ -352,6 +353,9 @@ func (a *Analyzer) point(ctx context.Context, id uint64) (pointState, error) {
 		return state, err
 	}
 	a.points[id] = state
+	if a.mapInvalidated != nil {
+		a.mapInvalidated(candidates...)
+	}
 	return state, nil
 }
 
@@ -389,6 +393,9 @@ func (a *Analyzer) Evaluate(ctx context.Context, now time.Time) error {
 					return err
 				}
 				group.Confirmed = false
+				if a.mapInvalidated != nil {
+					a.mapInvalidated(a.groupSources[id]...)
+				}
 				a.knownGroups--
 				a.logger.WithFields(logrus.Fields{"nest_id": id, "species": group.Pair.String(), "support": len(backing)}).Info("nest confirmation withdrawn: insufficient roll coverage")
 			}
@@ -459,12 +466,18 @@ func (a *Analyzer) Evaluate(ctx context.Context, now time.Time) error {
 			}
 			group.Pair, group.Confirmed, group.LastChanged = d.Pair, true, changed
 			group.Conflicting = false
+			if a.mapInvalidated != nil {
+				a.mapInvalidated(a.groupSources[id]...)
+			}
 		} else if !ok && group.Confirmed && !group.Conflicting {
 			if counts := conflictingEvidence(group, observations, now, a.cfg.Minimum, a.cfg.Agreement); counts != nil {
 				if err := a.withdraw(ctx, id, "conflicting"); err != nil {
 					return err
 				}
 				group.Conflicting = true
+				if a.mapInvalidated != nil {
+					a.mapInvalidated(a.groupSources[id]...)
+				}
 				a.conflictingGroups++
 				votes := map[string]int{}
 				for pair, count := range counts {

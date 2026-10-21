@@ -7,6 +7,7 @@ password = "change-me"
 
 [http]
 addr = "127.0.0.1:9042"
+# map_addr = "10.0.1.2:9042"
 
 [logging]
 level = "info"

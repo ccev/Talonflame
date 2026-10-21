@@ -27,12 +27,15 @@ type Server struct {
 	evidence    atomic.Uint64
 	confirmed   atomic.Uint64
 	conflicting atomic.Uint64
+	mapData     *mapStore
 }
 
 func NewServer(analyzer *Analyzer) *Server {
 	server := &Server{analyzer: analyzer, queue: make(chan batch, 64), queries: make(chan snapshotRequest)}
 	if analyzer != nil {
 		server.recordState()
+		server.mapData = newMapStore(analyzer.db, analyzer.logger)
+		analyzer.mapInvalidated = server.mapData.invalidate
 	}
 	return server
 }
@@ -43,10 +46,24 @@ func (s *Server) recordState() {
 	s.conflicting.Store(s.analyzer.conflictingGroups)
 }
 
+// MapHandler is suitable for an optional private-network read-only listener.
+func (s *Server) MapHandler() http.Handler {
+	mux := http.NewServeMux()
+	if s.mapData != nil {
+		mux.HandleFunc("/api/map/nests", s.mapData.serveHTTP)
+		mux.HandleFunc("/api/map/nests/stats", s.mapData.serveHTTP)
+	}
+	return mux
+}
+
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/webhook", s.webhook)
 	mux.HandleFunc("/api/nests", s.nests)
+	if s.mapData != nil {
+		mux.HandleFunc("/api/map/nests", s.mapData.serveHTTP)
+		mux.HandleFunc("/api/map/nests/stats", s.mapData.serveHTTP)
+	}
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 		defer cancel()
@@ -64,6 +81,9 @@ func (s *Server) Handler() http.Handler {
 		var memory runtime.MemStats
 		runtime.ReadMemStats(&memory)
 		fmt.Fprintf(w, "talonflame_go_heap_alloc_bytes %d\ntalonflame_go_heap_inuse_bytes %d\ntalonflame_go_heap_objects %d\n", memory.HeapAlloc, memory.HeapInuse, memory.HeapObjects)
+		if s.mapData != nil {
+			fmt.Fprintf(w, "talonflame_map_builds_total %d\ntalonflame_map_last_success_seconds %d\n", s.mapData.builds.Load(), s.mapData.lastSuccess.Load())
+		}
 	})
 	return mux
 }
@@ -118,6 +138,15 @@ func (s *Server) nests(w http.ResponseWriter, r *http.Request) {
 func (s *Server) Drain() { close(s.queue) }
 
 func (s *Server) Run(ctx context.Context) error {
+	mapCtx, stopMap := context.WithCancel(ctx)
+	mapDone := make(chan struct{})
+	go func() {
+		defer close(mapDone)
+		if s.mapData != nil {
+			s.mapData.run(mapCtx)
+		}
+	}()
+	defer func() { stopMap(); <-mapDone }()
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
 	lastMaintenance := time.Now()

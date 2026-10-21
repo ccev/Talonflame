@@ -5,10 +5,11 @@ go 1.22.1
 require (
 	github.com/Depado/ginprom v1.8.1
 	github.com/dernise/venise v0.0.0-20171123123043-63ab681c3498
+	github.com/engelsjk/polygol v0.0.3
 	github.com/gin-gonic/gin v1.10.0
 	github.com/go-sql-driver/mysql v1.8.1
-	github.com/golang/geo v0.0.0-20230421003525-6adc56603217
 	github.com/golang-migrate/migrate/v4 v4.17.1
+	github.com/golang/geo v0.0.0-20230421003525-6adc56603217
 	github.com/grafana/pyroscope-go v1.1.1
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/knadh/koanf/parsers/toml v0.1.0
@@ -32,6 +33,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cloudwego/base64x v0.1.4 // indirect
 	github.com/cloudwego/iasm v0.2.0 // indirect
+	github.com/engelsjk/splay-tree v0.0.1 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.4 // indirect

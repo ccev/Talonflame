@@ -178,6 +178,9 @@ func (a *Analyzer) createGroup(ctx context.Context, sources []int64, pair Pair, 
 		a.sources[source] = append(a.sources[source], id)
 	}
 	a.groupSources[id] = sources
+	if a.mapInvalidated != nil {
+		a.mapInvalidated(sources...)
+	}
 	return id, nil
 }
 
@@ -207,7 +210,12 @@ func (a *Analyzer) assign(ctx context.Context, point uint64, nest int64, status,
 	if err = tx.Commit(); err != nil {
 		return err
 	}
+	previous := a.points[point].Nest
 	a.points[point] = pointState{Nest: nest, Status: status}
+	if a.mapInvalidated != nil {
+		a.mapInvalidated(a.groupSources[previous]...)
+		a.mapInvalidated(a.groupSources[nest]...)
+	}
 	for _, entry := range a.byPoint[point] {
 		o := *entry
 		if pair == nil || o.Pair == *pair {

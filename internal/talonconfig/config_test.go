@@ -24,6 +24,7 @@ socket = "/run/mysqld/mysqld.sock"
 password = "test-only"
 [http]
 addr = "127.0.0.1:9999"
+map_addr = "127.0.0.1:9998"
 [logging]
 level = "debug"
 [tuning]
@@ -39,7 +40,7 @@ backfill_batch_size = 10000
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Database.Socket != "/run/mysqld/mysqld.sock" || cfg.Database.DB != "golbat" || cfg.HTTP.Addr != "127.0.0.1:9999" || cfg.Tuning.MinConfirmations != 8 || cfg.Tuning.ChangeWindow != 5*time.Minute || cfg.Tuning.EvidenceRetention != 24*time.Hour || cfg.Tuning.BackfillBatchSize != 10000 || cfg.Logger().GetLevel() != logrus.DebugLevel {
+	if cfg.Database.Socket != "/run/mysqld/mysqld.sock" || cfg.Database.DB != "golbat" || cfg.HTTP.Addr != "127.0.0.1:9999" || cfg.HTTP.MapAddr != "127.0.0.1:9998" || cfg.Tuning.MinConfirmations != 8 || cfg.Tuning.ChangeWindow != 5*time.Minute || cfg.Tuning.EvidenceRetention != 24*time.Hour || cfg.Tuning.BackfillBatchSize != 10000 || cfg.Logger().GetLevel() != logrus.DebugLevel {
 		t.Fatal("configuration overrides were not applied", cfg)
 	}
 }
@@ -52,6 +53,8 @@ func TestInvalidConfig(t *testing.T) {
 		{"batch", "[tuning]\nbackfill_batch_size = 0\n", "backfill_batch_size"},
 		{"logging", "[logging]\nlevel = \"bad\"\n", "logging.level"},
 		{"address", "[http]\naddr = \"bad\"\n", "http.addr"},
+		{"map-address", "[http]\nmap_addr = \"bad\"\n", "http.map_addr"},
+		{"duplicate-address", "[http]\nmap_addr = \"127.0.0.1:9042\"\n", "must differ"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "config.toml")
