@@ -12,6 +12,13 @@ for viewport queries; antimeridian-crossing bounds are supported. `limit` is 1â€
 (default 10000). Optional `pokemon=16,276` filters species. Instead of a viewport,
 use `GET /api/map/nests?id=-375` for a logical group, including negative IDs.
 
+Talonflame group confirmation controls visibility. Legacy Fletchling `active`,
+`discarded` and cached source spawnpoint counts do not gate a confirmed group:
+those fields describe the old abundance-based analyzer's eligibility, not the
+learned nest's validity. Provisional, conflicting and species-less groups are
+still excluded. Source deletion or withdrawal of confirmation removes the region
+on the next snapshot refresh; no bulk activation of imported polygons is needed.
+
 ```json
 {"revision":"...","snapshot":true,"examined":1,"data":[{"id":"8103463","pokemon_id":16,"form":0,"name":"Planten un Blomen","area_name":"Hamburg","lat":53.56,"lon":9.98,"spawnpoints":1005,"m2":298865.7,"last_changed":null,"geometry":{"type":"MultiPolygon","coordinates":[]}}]}
 ```

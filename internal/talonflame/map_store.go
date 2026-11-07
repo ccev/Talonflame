@@ -99,7 +99,8 @@ func (m *mapStore) invalidate(ids ...int64) {
 }
 
 // A single background builder coalesces analyzer notifications. The minute
-// sweep detects external source geometry/name/active changes, including deletes.
+// sweep detects external source geometry/name changes and group withdrawals,
+// including deletes. Legacy Fletchling activation is not a confirmation signal.
 func (m *mapStore) run(ctx context.Context) {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
@@ -129,7 +130,7 @@ func (m *mapStore) scanSources(ctx context.Context) error {
  SHA2(ST_AsWKB(n.polygon),256),g.nest_id,g.pokemon_id,g.pokemon_form,g.last_changed
  FROM nests n JOIN talonflame_nest_sources s ON s.source_nest_id=n.nest_id
  JOIN talonflame_nest_groups g ON g.nest_id=s.group_id
- WHERE n.active=1 AND g.status='confirmed' AND g.pokemon_id IS NOT NULL
+ WHERE g.status='confirmed' AND g.pokemon_id IS NOT NULL
  ORDER BY n.nest_id,g.nest_id`)
 	if err != nil {
 		return err
@@ -249,7 +250,7 @@ func (m *mapStore) loadSources(ctx context.Context, ids []int64) (map[int64]*map
  g.nest_id,g.pokemon_id,g.pokemon_form,g.last_changed
  FROM nests n JOIN talonflame_nest_sources s ON s.source_nest_id=n.nest_id
  JOIN talonflame_nest_groups g ON g.nest_id=s.group_id
- WHERE n.active=1 AND g.status='confirmed' AND g.pokemon_id IS NOT NULL
+ WHERE g.status='confirmed' AND g.pokemon_id IS NOT NULL
  AND n.nest_id IN (`+placeholders+`) ORDER BY n.nest_id,g.nest_id`, args...)
 	if err != nil {
 		return nil, err
