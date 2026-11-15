@@ -244,7 +244,7 @@ func TestMariaDBAnalyzerLifecycle(t *testing.T) {
 	exec("CREATE USER 'talon_analyzer_test'@'localhost' IDENTIFIED BY 'talon'")
 	quoted := "`" + cfg.DBName + "`"
 	exec("GRANT ALL PRIVILEGES ON " + quoted + ".nests TO 'talon_analyzer_test'@'localhost'")
-	exec("GRANT SELECT (id), UPDATE, ALTER ON " + quoted + ".spawnpoint TO 'talon_analyzer_test'@'localhost'")
+	exec("GRANT SELECT (id,talonflame_nest_id), UPDATE, ALTER ON " + quoted + ".spawnpoint TO 'talon_analyzer_test'@'localhost'")
 	rows, err := admin.Query("SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND LEFT(TABLE_NAME,11)='talonflame_'")
 	if err != nil {
 		t.Fatal(err)

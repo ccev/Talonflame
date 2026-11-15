@@ -47,6 +47,12 @@ Requires Go 1.22+, MariaDB, and Golbat with imported nest polygons and spawnpoin
    ./talonflame-db-migrate -apply
    ```
 
+   After schema creation, grant read access to Talonflame's assignment column for null-safe updates:
+
+   ```sh
+   mariadb -u root -p golbat < scripts/grant-talon-runtime.sql
+   ```
+
 5. Run
 
    ```sh
@@ -56,3 +62,7 @@ Requires Go 1.22+, MariaDB, and Golbat with imported nest polygons and spawnpoin
    Point Golbat's `pokemon` or `pokemon_iv` webhook at `http://127.0.0.1:9042/webhook` (match your configured address). Health, metrics, and inferred nests are available at `/healthz`, `/metrics`, and `/api/nests`. The cached map API is documented in [docs/API.md](docs/API.md).
 
 For Docker, copy `docker-compose.yml.example` to `docker-compose.yml` and run `docker compose up -d --build` after database preparation. The example uses host networking and a local MariaDB socket.
+
+## Upgrading assignment maintenance
+
+Stop Talonflame, apply `scripts/grant-talon.sql` as an administrator, run `./talonflame-db-migrate -mode schema -apply`, then apply `scripts/grant-talon-runtime.sql` before starting the new binary. Migration `002_spawnpoint_pending.sql` adds a durable retry queue for spawnpoints that Golbat inserts after their first webhook. New and changed assignments are published by primary key; hourly maintenance retries only queued IDs in transactions of at most 256 points, skipping values that already match. Missing rows remain queued across restarts.

@@ -193,7 +193,7 @@ func (a *Analyzer) assign(ctx context.Context, point uint64, nest int64, status,
 	if _, err = tx.ExecContext(ctx, "UPDATE talonflame_spawnpoint_state SET nest_id=?,status=?,reason=? WHERE spawnpoint_id=?", nullableNest(nest), status, reason, point); err != nil {
 		return err
 	}
-	if _, err = tx.ExecContext(ctx, "UPDATE spawnpoint SET talonflame_nest_id=? WHERE id=?", nullableNest(nest), point); err != nil {
+	if err = projectSpawnpoint(ctx, tx, point, nest); err != nil {
 		return err
 	}
 	// Move only evidence for the coherent alternate pair. For rejected points,
@@ -232,9 +232,5 @@ func (a *Analyzer) Maintain(ctx context.Context, now time.Time) error {
 	if _, err := a.db.ExecContext(ctx, "DELETE FROM talonflame_evidence WHERE observed_at<?", cutoff); err != nil {
 		return err
 	}
-	// Golbat may create a DB row after sending its first webhook. Reconcile
-	// that late row without needing SELECT on Talonflame's spawnpoint column.
-	_, err := a.db.ExecContext(ctx, `UPDATE spawnpoint p JOIN talonflame_spawnpoint_state s ON s.spawnpoint_id=p.id
-	 SET p.talonflame_nest_id=s.nest_id`)
-	return err
+	return a.reconcileSpawnpoints(ctx)
 }

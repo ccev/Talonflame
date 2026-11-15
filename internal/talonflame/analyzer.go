@@ -83,7 +83,7 @@ func New(ctx context.Context, db *sql.DB, logger *logrus.Logger, cfg Config) (*A
 		return nil, err
 	}
 	var applied int
-	if err := conn.QueryRowContext(ctx, "SELECT COUNT(*) FROM talonflame_schema_migrations WHERE version='001_schema.sql'").Scan(&applied); err != nil || applied != 1 {
+	if err := conn.QueryRowContext(ctx, "SELECT COUNT(*) FROM talonflame_schema_migrations WHERE version IN ('001_schema.sql','002_spawnpoint_pending.sql')").Scan(&applied); err != nil || applied != 2 {
 		return nil, fmt.Errorf("apply Talonflame schema first")
 	}
 	a.membership, err = talonmigration.LoadMembership(ctx, conn)
@@ -346,7 +346,7 @@ func (a *Analyzer) point(ctx context.Context, id uint64) (pointState, error) {
 			return state, err
 		}
 	}
-	if _, err = tx.ExecContext(ctx, "UPDATE spawnpoint SET talonflame_nest_id=? WHERE id=?", nullableNest(state.Nest), id); err != nil {
+	if err = projectSpawnpoint(ctx, tx, id, state.Nest); err != nil {
 		return state, err
 	}
 	if err = tx.Commit(); err != nil {

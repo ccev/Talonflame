@@ -17,3 +17,5 @@ GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER
 ON `golbat`.`talonflame_backfill_assignments` TO 'talon'@'localhost';
 GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER
 ON `golbat`.`talonflame_backfill_candidates` TO 'talon'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER
+ON `golbat`.`talonflame_spawnpoint_pending` TO 'talon'@'localhost';

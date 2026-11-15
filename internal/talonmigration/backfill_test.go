@@ -107,7 +107,7 @@ func TestMariaDBMigrationAndBackfill(t *testing.T) {
 	exec("GRANT ALL PRIVILEGES ON " + quotedDB + ".nests TO 'talon'@'localhost'")
 	exec("GRANT UPDATE, ALTER ON " + quotedDB + ".spawnpoint TO 'talon'@'localhost'")
 	exec("GRANT SELECT (id) ON " + quotedDB + ".spawnpoint TO 'talon'@'localhost'")
-	for _, table := range []string{"schema_migrations", "nest_groups", "nest_sources", "spawnpoint_candidates", "spawnpoint_state", "evidence", "backfill_assignments", "backfill_candidates"} {
+	for _, table := range []string{"schema_migrations", "nest_groups", "nest_sources", "spawnpoint_candidates", "spawnpoint_state", "spawnpoint_pending", "evidence", "backfill_assignments", "backfill_candidates"} {
 		exec("GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER ON " + quotedDB + ".talonflame_" + table + " TO 'talon'@'localhost'")
 	}
 	cfg.User, cfg.Passwd = "talon", "talon"
