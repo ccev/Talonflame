@@ -66,3 +66,7 @@ For Docker, copy `docker-compose.yml.example` to `docker-compose.yml` and run `d
 ## Upgrading assignment maintenance
 
 Stop Talonflame, apply `scripts/grant-talon.sql` as an administrator, run `./talonflame-db-migrate -mode schema -apply`, then apply `scripts/grant-talon-runtime.sql` before starting the new binary. Migration `002_spawnpoint_pending.sql` adds a durable retry queue for spawnpoints that Golbat inserts after their first webhook. New and changed assignments are published by primary key; hourly maintenance retries only queued IDs in transactions of at most 256 points, skipping values that already match. Missing rows remain queued across restarts.
+
+## Evidence retention
+
+Hourly cleanup reads at most 256 expired evidence keys through the retention index, then deletes only those full primary keys in a separate `READ COMMITTED` transaction. Each batch commits before a cancellable 50 ms pause. The delete rechecks the retention cutoff to preserve refreshed observations; interrupted cleanup resumes from the remaining expired rows on the next run.

@@ -229,7 +229,7 @@ func (a *Analyzer) assign(ctx context.Context, point uint64, nest int64, status,
 func (a *Analyzer) Maintain(ctx context.Context, now time.Time) error {
 	cutoff := now.Add(-a.cfg.Retention).Unix()
 	a.expireEvidence(cutoff)
-	if _, err := a.db.ExecContext(ctx, "DELETE FROM talonflame_evidence WHERE observed_at<?", cutoff); err != nil {
+	if err := a.deleteExpiredEvidence(ctx, cutoff); err != nil {
 		return err
 	}
 	return a.reconcileSpawnpoints(ctx)
